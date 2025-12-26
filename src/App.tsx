@@ -443,8 +443,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// ... (ProductCardSkeleton, ProductCard, HomePage, ProductListPage, ProductDetailPage, CartPage, CheckoutPage components remain the same) ...
-
 const ProductCardSkeleton = () => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-stone-100 overflow-hidden">
@@ -1358,12 +1356,26 @@ const LoginPage = ({ initialAdmin = false }: { initialAdmin?: boolean }) => {
            {isLogin ? 'Sign in to your account' : 'Create your account'}
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
-           <input type="email" required placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3 border rounded-lg" />
-           <input type="password" required placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 border rounded-lg" />
+           <input 
+             type="email" 
+             required 
+             placeholder="Email address" 
+             value={email} 
+             onChange={e => setEmail(e.target.value)} 
+             className="w-full p-3 border border-stone-300 rounded-lg bg-white text-stone-900 placeholder-stone-400 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" 
+           />
+           <input 
+             type="password" 
+             required 
+             placeholder="Password" 
+             value={password} 
+             onChange={e => setPassword(e.target.value)} 
+             className="w-full p-3 border border-stone-300 rounded-lg bg-white text-stone-900 placeholder-stone-400 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" 
+           />
            
            <div className="flex items-center gap-2">
-              <input type="checkbox" id="admin" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} />
-              <label htmlFor="admin">Login as Admin</label>
+              <input type="checkbox" id="admin" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} className="rounded text-brand-600 focus:ring-brand-500" />
+              <label htmlFor="admin" className="text-stone-700">Login as Admin</label>
            </div>
 
            <Button className="w-full justify-center">{isLogin ? 'Sign In' : 'Sign Up'}</Button>
