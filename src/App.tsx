@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useParams, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { ShoppingBag, Heart, User as UserIcon, Menu, X, Search, Star, Truck, ShieldCheck, Leaf, ArrowRight, Minus, Plus, Trash2, Home, Package, BarChart3, Users, LogOut, CheckCircle, ChevronDown, Filter, Sparkles, Loader2, Upload, Zap, Mail, Phone, MapPin, Calendar, Lock, AlertCircle, TrendingUp, DollarSign, ShoppingCart, Percent, Edit2, Save, Image as ImageIcon, Clock, CreditCard, Eye, FileText } from 'lucide-react';
+import { ShoppingBag, Heart, User as UserIcon, Menu, X, Search, Star, Truck, ShieldCheck, Leaf, ArrowRight, Minus, Plus, Trash2, Home, Package, BarChart3, Users, LogOut, CheckCircle, ChevronDown, Filter, Sparkles, Loader2, Upload, Zap, Mail, Phone, MapPin, Calendar, Lock, AlertCircle, TrendingUp, DollarSign, ShoppingCart, Percent, Edit2, Save, Image as ImageIcon, Clock, CreditCard, Eye, EyeOff, FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
 import { GoogleGenAI } from "@google/genai";
 
@@ -1313,79 +1313,271 @@ const AdminDashboard = () => {
 const LoginPage = ({ initialAdmin = false }: { initialAdmin?: boolean }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [isAdmin, setIsAdmin] = useState(initialAdmin);
+  
+  // Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Validation States
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
   const { login } = useAuthStore();
   const { registeredUsers, registerUser } = useDataStore();
   const navigate = useNavigate();
 
+  // Reset states when switching modes
+  useEffect(() => {
+    setErrors({});
+    setGlobalError(null);
+    setEmail('');
+    setPassword('');
+    setName('');
+    setMobile('');
+    setShowPassword(false);
+  }, [isLogin, isAdmin]);
+
+  const validate = () => {
+    const newErrors: { [key: string]: string } = {};
+    
+    if (!email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Please enter a valid email address';
+
+    if (!password) newErrors.password = 'Password is required';
+    else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+
+    if (!isLogin) {
+      if (!name.trim()) newErrors.name = 'Full Name is required';
+      
+      const cleanMobile = mobile.replace(/\D/g, '');
+      if (!cleanMobile) newErrors.mobile = 'Mobile number is required';
+      else if (cleanMobile.length !== 10) newErrors.mobile = 'Please enter a valid 10-digit mobile number';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/\D/g, '');
+    const truncated = rawValue.slice(0, 10);
+    let formatted = truncated;
+    if (truncated.length > 5) {
+      formatted = `${truncated.slice(0, 5)} ${truncated.slice(5)}`;
+    }
+    setMobile(formatted);
+    if (errors.mobile) setErrors({ ...errors, mobile: '' });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const user = registeredUsers.find(u => u.email === email && u.role === (isAdmin ? 'admin' : 'customer'));
+    setGlobalError(null);
+
+    if (!validate()) return;
     
+    const normalizedEmail = email.toLowerCase().trim();
+    const targetRole = isAdmin ? 'admin' : 'customer';
+
     if (isLogin) {
+      const user = registeredUsers.find(
+        u => u.email.toLowerCase() === normalizedEmail && u.role === targetRole
+      );
+
       if (user) {
         login(user);
         navigate(isAdmin ? '/admin' : '/');
       } else {
-        alert('User not found or incorrect role');
+        const existingUserAnyRole = registeredUsers.find(
+          u => u.email.toLowerCase() === normalizedEmail
+        );
+
+        if (existingUserAnyRole) {
+           setGlobalError(`Account found but it is a ${existingUserAnyRole.role} account. Please ${isAdmin ? 'uncheck' : 'check'} "Login as Admin".`);
+        } else {
+           setGlobalError('No account found with these credentials.');
+        }
       }
     } else {
-      if (user) {
-        alert('User already exists');
-      } else {
-        const newUser: User = {
-          id: `user-${Date.now()}`,
-          name: email.split('@')[0],
-          email,
-          role: 'customer',
-          isVerified: true
-        };
+      const existingUser = registeredUsers.find(u => u.email.toLowerCase() === normalizedEmail);
+      if (existingUser) {
+        setGlobalError('An account with this email already exists. Please Sign In.');
+        return;
+      }
+
+      const newUser: User = {
+        id: `user-${Date.now()}`,
+        name: name.trim(),
+        email: normalizedEmail,
+        mobile: mobile.replace(/\s/g, ''),
+        role: targetRole,
+        isVerified: true
+      };
+
+      try {
         registerUser(newUser);
         login(newUser);
-        navigate('/');
+        navigate(isAdmin ? '/admin' : '/');
+      } catch (err) {
+        console.error(err);
+        setGlobalError('Failed to create account. Please try again.');
       }
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center bg-stone-50 py-12 px-4">
-      <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg">
-        <h2 className="text-3xl font-serif font-bold text-center mb-2">{isLogin ? 'Welcome Back' : 'Join Us'}</h2>
-        <p className="text-center text-stone-500 mb-8">
-           {isLogin ? 'Sign in to your account' : 'Create your account'}
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-           <input 
-             type="email" 
-             required 
-             placeholder="Email address" 
-             value={email} 
-             onChange={e => setEmail(e.target.value)} 
-             className="w-full p-3 border border-stone-300 rounded-lg bg-white text-stone-900 placeholder-stone-400 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" 
-           />
-           <input 
-             type="password" 
-             required 
-             placeholder="Password" 
-             value={password} 
-             onChange={e => setPassword(e.target.value)} 
-             className="w-full p-3 border border-stone-300 rounded-lg bg-white text-stone-900 placeholder-stone-400 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all" 
-           />
-           
-           <div className="flex items-center gap-2">
-              <input type="checkbox" id="admin" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} className="rounded text-brand-600 focus:ring-brand-500" />
-              <label htmlFor="admin" className="text-stone-700">Login as Admin</label>
-           </div>
-
-           <Button className="w-full justify-center">{isLogin ? 'Sign In' : 'Sign Up'}</Button>
-        </form>
-        <div className="mt-4 text-center">
-           <button onClick={() => setIsLogin(!isLogin)} className="text-brand-600 text-sm hover:underline">{isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}</button>
+    <div className="min-h-screen flex bg-brand-50">
+      {/* Image Side (Desktop only) */}
+      <div className="hidden lg:flex w-1/2 bg-brand-900 relative items-center justify-center overflow-hidden">
+        <img 
+          src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?q=80&w=2070&auto=format&fit=crop" 
+          className="absolute inset-0 w-full h-full object-cover opacity-30" 
+          alt="Spices"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-900/80 via-transparent to-transparent"></div>
+        <div className="relative z-10 text-center text-white px-12 max-w-xl">
+          <h1 className="text-6xl font-serif font-bold mb-6 tracking-tight">SpicePatrao</h1>
+          <div className="w-24 h-1 bg-brand-500 mx-auto mb-8 rounded-full"></div>
+          <p className="text-xl text-brand-200 font-light leading-relaxed">Experience the true essence of Indian heritage. Authentic, hand-picked spices delivered straight from Kerala's finest farms to your kitchen.</p>
         </div>
-        <div className="mt-6 text-xs text-stone-400 bg-stone-50 p-2 rounded">
-           <p>Demo Admin: admin@spice.com / pass</p>
-           <p>Demo User: user@example.com / pass</p>
+      </div>
+
+      {/* Form Side */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-12 relative">
+        <Link to="/" className="absolute top-8 right-8 p-2 text-stone-400 hover:text-stone-800 transition-colors">
+           <X className="w-6 h-6" />
+        </Link>
+        
+        <div className="max-w-md w-full bg-white p-8 md:p-10 rounded-3xl shadow-xl border border-stone-100">
+          <div className="text-center mb-8">
+             <h2 className="text-3xl font-serif font-bold text-stone-800 mb-2">
+               {isLogin ? 'Welcome Back' : 'Create Account'}
+             </h2>
+             <p className="text-stone-500">
+                {isLogin ? 'Enter your details to sign in' : 'Join us for exclusive offers & recipes'}
+             </p>
+          </div>
+
+          {globalError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <span className="font-medium">{globalError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+             {!isLogin && (
+               <>
+                 <div className="space-y-1">
+                   <div className="relative">
+                     <UserIcon className="absolute left-4 top-3.5 w-5 h-5 text-stone-400" />
+                     <input 
+                       type="text" 
+                       placeholder="Full Name" 
+                       value={name} 
+                       onChange={e => { setName(e.target.value); if(errors.name) setErrors({...errors, name: ''}); }}
+                       className={`w-full pl-12 pr-4 py-3 border rounded-xl bg-stone-50 text-stone-900 focus:ring-2 focus:ring-brand-500 outline-none transition-all ${errors.name ? 'border-red-300 focus:ring-red-200' : 'border-stone-200'}`} 
+                     />
+                   </div>
+                   {errors.name && <p className="text-xs text-red-500 ml-1">{errors.name}</p>}
+                 </div>
+
+                 <div className="space-y-1">
+                   <div className="relative">
+                     <Phone className="absolute left-4 top-3.5 w-5 h-5 text-stone-400" />
+                     <input 
+                       type="tel" 
+                       placeholder="Mobile Number (e.g. 98765 43210)" 
+                       value={mobile} 
+                       onChange={handleMobileChange} 
+                       className={`w-full pl-12 pr-4 py-3 border rounded-xl bg-stone-50 text-stone-900 focus:ring-2 focus:ring-brand-500 outline-none transition-all ${errors.mobile ? 'border-red-300 focus:ring-red-200' : 'border-stone-200'}`} 
+                     />
+                   </div>
+                   {errors.mobile && <p className="text-xs text-red-500 ml-1">{errors.mobile}</p>}
+                 </div>
+               </>
+             )}
+
+             <div className="space-y-1">
+               <div className="relative">
+                 <Mail className="absolute left-4 top-3.5 w-5 h-5 text-stone-400" />
+                 <input 
+                   type="email" 
+                   placeholder="Email Address" 
+                   value={email} 
+                   onChange={e => { setEmail(e.target.value); if(errors.email) setErrors({...errors, email: ''}); }}
+                   className={`w-full pl-12 pr-4 py-3 border rounded-xl bg-stone-50 text-stone-900 focus:ring-2 focus:ring-brand-500 outline-none transition-all ${errors.email ? 'border-red-300 focus:ring-red-200' : 'border-stone-200'}`} 
+                 />
+               </div>
+               {errors.email && <p className="text-xs text-red-500 ml-1">{errors.email}</p>}
+             </div>
+
+             <div className="space-y-1">
+               <div className="relative">
+                 <Lock className="absolute left-4 top-3.5 w-5 h-5 text-stone-400" />
+                 <input 
+                   type={showPassword ? "text" : "password"}
+                   placeholder="Password" 
+                   value={password} 
+                   onChange={e => { setPassword(e.target.value); if(errors.password) setErrors({...errors, password: ''}); }}
+                   className={`w-full pl-12 pr-12 py-3 border rounded-xl bg-stone-50 text-stone-900 focus:ring-2 focus:ring-brand-500 outline-none transition-all ${errors.password ? 'border-red-300 focus:ring-red-200' : 'border-stone-200'}`} 
+                 />
+                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-3.5 text-stone-400 hover:text-stone-600 transition-colors" aria-label={showPassword ? "Hide password" : "Show password"}>
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                 </button>
+               </div>
+               {errors.password && <p className="text-xs text-red-500 ml-1">{errors.password}</p>}
+             </div>
+             
+             <div className="flex items-center justify-between py-2">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isAdmin ? 'bg-brand-600 border-brand-600' : 'border-stone-300 group-hover:border-brand-400'}`}>
+                    {isAdmin && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    className="hidden"
+                    checked={isAdmin} 
+                    onChange={e => setIsAdmin(e.target.checked)} 
+                  />
+                  <span className="text-sm text-stone-600 font-medium select-none">
+                    {isLogin ? 'Login as Admin' : 'Register as Admin'}
+                  </span>
+                </label>
+                {isLogin && <a href="#" className="text-xs font-bold text-brand-600 hover:text-brand-700">Forgot Password?</a>}
+             </div>
+
+             <Button type="submit" className="w-full justify-center text-lg py-3.5 shadow-lg shadow-brand-500/20 hover:shadow-brand-500/30 transition-all transform hover:-translate-y-0.5">
+               {isLogin ? 'Sign In' : 'Sign Up'}
+             </Button>
+          </form>
+
+          <div className="mt-8 text-center">
+             <p className="text-stone-500 text-sm">
+               {isLogin ? "Don't have an account?" : "Already have an account?"}
+               <button 
+                 type="button" 
+                 onClick={() => setIsLogin(!isLogin)} 
+                 className="ml-2 text-brand-600 font-bold hover:text-brand-700 hover:underline transition-all"
+               >
+                 {isLogin ? "Create Account" : "Sign In"}
+               </button>
+             </p>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-stone-100">
+             <p className="text-xs font-bold text-stone-400 uppercase tracking-widest text-center mb-4">Demo Credentials</p>
+             <div className="flex justify-center gap-4 text-xs">
+                <div className="bg-stone-50 px-3 py-2 rounded border border-stone-200 text-stone-600">
+                  <span className="font-bold text-stone-800">Admin:</span> admin@spice.com
+                </div>
+                <div className="bg-stone-50 px-3 py-2 rounded border border-stone-200 text-stone-600">
+                  <span className="font-bold text-stone-800">User:</span> user@example.com
+                </div>
+             </div>
+          </div>
         </div>
       </div>
     </div>
